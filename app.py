@@ -130,12 +130,21 @@ def login():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"message": "Invalid email or password"}), 401
 
+    # ✅ Create a proper session
     session.permanent = True
     session["user"] = user["email"]
     session["user_id"] = str(user["_id"])
 
     users.update_one({"email": email}, {"$set": {"last_login": datetime.utcnow()}})
-    return jsonify({"message": "Login successful", "username": user["username"]}), 200
+
+    # ✅ Explicitly attach cookie to response (Render/SocketIO fix)
+    response = jsonify({
+        "message": "Login successful",
+        "username": user["username"]
+    })
+    app.session_interface.save_session(app, session, response)
+
+    return response, 200
 
 
 @app.route("/logout", methods=["POST"])
