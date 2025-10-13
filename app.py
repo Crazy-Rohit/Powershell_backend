@@ -9,27 +9,25 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from flask_socketio import SocketIO
 from threading import Thread
+import urllib.parse
 
-# =========================
+# ======================================================
 # Initialization
-# =========================
+# ======================================================
 load_dotenv()
 app = Flask(__name__)
 
-# =========================
-# Sessions & CORS
-# =========================
+# ======================================================
+# Session & CORS Configuration
+# ======================================================
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 app.permanent_session_lifetime = timedelta(days=1)
 
 APP_DOMAIN = os.getenv("APP_DOMAIN")
 FRONTEND_URLS = [
-    o.strip() for o in os.getenv(
-        "FRONTEND_URLS", "http://localhost:3000"
-    ).split(",")
+    o.strip() for o in os.getenv("FRONTEND_URLS", "http://localhost:3000").split(",")
 ]
 
-# Proper cookie setup for local + production
 if APP_DOMAIN:
     app.config.update(
         SESSION_COOKIE_DOMAIN=f".{APP_DOMAIN}",
@@ -38,7 +36,6 @@ if APP_DOMAIN:
         SESSION_COOKIE_HTTPONLY=True,
     )
 else:
-    # Local dev cookies
     app.config.update(
         SESSION_COOKIE_SAMESITE="None",
         SESSION_COOKIE_SECURE=False,
@@ -55,9 +52,9 @@ CORS(
 
 socketio = SocketIO(app, cors_allowed_origins=FRONTEND_URLS)
 
-# =========================
+# ======================================================
 # MongoDB Setup
-# =========================
+# ======================================================
 mongo_uri = os.getenv("MONGO_URI")
 mongo_db = os.getenv("MONGO_DB")
 user_coll = os.getenv("MONGO_USER_COLLECTION")
@@ -67,9 +64,9 @@ client = MongoClient(mongo_uri)
 db = client[mongo_db]
 users = db["users"]
 
-# =========================
+# ======================================================
 # Helper Functions
-# =========================
+# ======================================================
 def get_user_df():
     data = list(db[user_coll].find({}, {"_id": 0})) if user_coll else []
     if not data:
@@ -94,9 +91,9 @@ def get_screenshot_df():
     return df
 
 
-# =========================
-# AUTHENTICATION ROUTES
-# =========================
+# ======================================================
+# Authentication Routes
+# ======================================================
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.get_json()
@@ -111,13 +108,15 @@ def signup():
         return jsonify({"message": "User already exists"}), 409
 
     hashed_password = generate_password_hash(password)
-    users.insert_one({
-        "username": username,
-        "email": email,
-        "password_hash": hashed_password,
-        "created_at": datetime.utcnow(),
-        "last_login": None
-    })
+    users.insert_one(
+        {
+            "username": username,
+            "email": email,
+            "password_hash": hashed_password,
+            "created_at": datetime.utcnow(),
+            "last_login": None,
+        }
+    )
     return jsonify({"message": "User registered successfully"}), 201
 
 
@@ -184,9 +183,9 @@ def api_profile():
     return jsonify(out), 200
 
 
-# =========================
-# ANALYTICS ROUTES
-# =========================
+# ======================================================
+# Analytics Routes
+# ======================================================
 @app.route("/metrics", methods=["GET"])
 def metrics():
     df = get_user_df()
@@ -270,11 +269,35 @@ def analysis():
     return jsonify(out)
 
 
-# =========================
-# REAL-TIME CHANGE STREAM
-# =========================
+# ======================================================
+# Table Routes ✅
+# ======================================================
+@app.route("/table/user_logs", methods=["GET"])
+def user_table():
+    df = get_user_df()
+    if df.empty:
+        return jsonify({"columns": [], "rows": []})
+    df = df.fillna("").astype(str)
+    cols = ["timestamp", "username", "application", "category", "operation", "details"]
+    df = df[[c for c in cols if c in df.columns]]
+    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
+
+
+@app.route("/table/screenshots", methods=["GET"])
+def screenshot_table():
+    df = get_screenshot_df()
+    if df.empty:
+        return jsonify({"columns": [], "rows": []})
+    df = df.fillna("").astype(str)
+    if "file_path" in df.columns:
+        df = df.drop(columns=["file_path"])
+    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
+
+
+# ======================================================
+# Real-Time Change Stream
+# ======================================================
 def watch_mongo_changes():
-    """Watch MongoDB for changes and broadcast to React dashboard."""
     try:
         pipeline = [{"$match": {"operationType": {"$in": ["insert", "update", "replace"]}}}]
         with client.watch(pipeline=pipeline, full_document="updateLookup") as stream:
@@ -287,16 +310,30 @@ def watch_mongo_changes():
 
 Thread(target=watch_mongo_changes, daemon=True).start()
 
-# =========================
-# HEALTH CHECK
-# =========================
+# ======================================================
+# Diagnostics Endpoint ✅
+# ======================================================
+@app.route("/routes")
+def list_routes():
+    """List all registered routes to confirm deployment."""
+    output = []
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(rule.methods)
+        line = urllib.parse.unquote(f"{rule.rule} ({methods})")
+        output.append(line)
+    return "<br>".join(sorted(output))
+
+
+# ======================================================
+# Health Check
+# ======================================================
 @app.route("/healthz")
 def healthz():
     return jsonify({"ok": True}), 200
 
 
-# =========================
-# RUN
-# =========================
+# ======================================================
+# Run
+# ======================================================
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
