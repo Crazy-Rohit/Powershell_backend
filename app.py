@@ -23,14 +23,22 @@ app = Flask(__name__)
 # ======================================================
 # Session & CORS Configuration (Works for Render + Local + Vercel)
 # ======================================================
+# ======================================================
+# ✅ FINAL Session & CORS Configuration (Guaranteed Fix)
+# ======================================================
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 app.permanent_session_lifetime = timedelta(days=1)
 
 FRONTEND_URLS = [
-    o.strip() for o in os.getenv("FRONTEND_URLS", "http://localhost:3000").split(",")
+    o.strip()
+    for o in os.getenv(
+        "FRONTEND_URLS",
+        "http://localhost:3000,https://powershell-frontend.vercel.app"
+    ).split(",")
 ]
 
-# ✅ Enable CORS with cookie/session support
+# ✅ Enable CORS with credentials for frontend communication
+from flask_cors import CORS
 CORS(
     app,
     supports_credentials=True,
@@ -39,28 +47,29 @@ CORS(
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 )
 
-# ✅ Detect if we're on Render (production)
+# ✅ Environment detection
 IS_PRODUCTION = "onrender.com" in os.getenv("RENDER_EXTERNAL_URL", "")
 
 if IS_PRODUCTION:
-    # Production: HTTPS (Render + Vercel)
+    # 🟢 Render / Production (Vercel Frontend)
     app.config.update(
-        SESSION_COOKIE_SAMESITE="None",
-        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_SAMESITE="None",   # allow cross-site cookie
+        SESSION_COOKIE_SECURE=True,       # must be HTTPS
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_DOMAIN=None,  # don't force .onrender.com
+        SESSION_COOKIE_DOMAIN=None,       # DO NOT force domain
     )
 else:
-    # Local: allow HTTP + localhost
+    # 💻 Local Development (localhost frontend)
     app.config.update(
         SESSION_COOKIE_SAMESITE="None",
-        SESSION_COOKIE_SECURE=False,
+        SESSION_COOKIE_SECURE=False,      # allow HTTP for local
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_DOMAIN=None,
     )
 
 # ✅ SocketIO CORS setup
 socketio = SocketIO(app, cors_allowed_origins=FRONTEND_URLS)
+
 
 # ======================================================
 # MongoDB Setup
