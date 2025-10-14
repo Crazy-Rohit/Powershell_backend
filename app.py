@@ -20,28 +20,17 @@ app = Flask(__name__)
 # ======================================================
 # Session & CORS Configuration
 # ======================================================
+# ======================================================
+# Session & CORS Configuration (Works for Render + Local + Vercel)
+# ======================================================
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 app.permanent_session_lifetime = timedelta(days=1)
 
-APP_DOMAIN = os.getenv("APP_DOMAIN")
 FRONTEND_URLS = [
     o.strip() for o in os.getenv("FRONTEND_URLS", "http://localhost:3000").split(",")
 ]
 
-if APP_DOMAIN:
-    app.config.update(
-        SESSION_COOKIE_DOMAIN=f".{APP_DOMAIN}",
-        SESSION_COOKIE_SAMESITE="None",
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-    )
-else:
-    app.config.update(
-        SESSION_COOKIE_SAMESITE="None",
-        SESSION_COOKIE_SECURE=False,
-        SESSION_COOKIE_HTTPONLY=True,
-    )
-
+# ✅ Enable CORS with cookie/session support
 CORS(
     app,
     supports_credentials=True,
@@ -50,6 +39,27 @@ CORS(
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 )
 
+# ✅ Detect if we're on Render (production)
+IS_PRODUCTION = "onrender.com" in os.getenv("RENDER_EXTERNAL_URL", "")
+
+if IS_PRODUCTION:
+    # Production: HTTPS (Render + Vercel)
+    app.config.update(
+        SESSION_COOKIE_SAMESITE="None",
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_DOMAIN=None,  # don't force .onrender.com
+    )
+else:
+    # Local: allow HTTP + localhost
+    app.config.update(
+        SESSION_COOKIE_SAMESITE="None",
+        SESSION_COOKIE_SECURE=False,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_DOMAIN=None,
+    )
+
+# ✅ SocketIO CORS setup
 socketio = SocketIO(app, cors_allowed_origins=FRONTEND_URLS)
 
 # ======================================================
