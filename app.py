@@ -308,7 +308,7 @@ def user_table():
     df = df.fillna("").astype(str)
     cols = ["timestamp", "username", "application", "category", "operation", "details"]
     df = df[[c for c in cols if c in df.columns]]
-    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
+    return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
 
 
 @app.route("/table/screenshots", methods=["GET"])
