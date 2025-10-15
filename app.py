@@ -309,7 +309,7 @@ def user_table():
     cols = ["timestamp", "username", "application", "category", "operation", "details"]
     df = df[[c for c in cols if c in df.columns]]
     df = df.iloc[::-1]
-    return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
+    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
 
 
 @app.route("/table/screenshots", methods=["GET"])
@@ -321,7 +321,7 @@ def screenshot_table():
     if "file_path" in df.columns:
         df = df.drop(columns=["file_path"])
         df = df.iloc[::-1]
-    return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
+    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
 
 
 # ======================================================
