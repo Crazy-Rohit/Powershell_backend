@@ -308,6 +308,7 @@ def user_table():
     df = df.fillna("").astype(str)
     cols = ["timestamp", "username", "application", "category", "operation", "details"]
     df = df[[c for c in cols if c in df.columns]]
+    df = df.iloc[::-1]
     return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
 
 
@@ -319,6 +320,7 @@ def screenshot_table():
     df = df.fillna("").astype(str)
     if "file_path" in df.columns:
         df = df.drop(columns=["file_path"])
+        df = df.iloc[::-1]
     return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
 
 
