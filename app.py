@@ -319,7 +319,7 @@ def screenshot_table():
     df = df.fillna("").astype(str)
     if "file_path" in df.columns:
         df = df.drop(columns=["file_path"])
-    return jsonify({"columns": list(df.columns), "rows": df.head(100).to_dict(orient="records")})
+    return jsonify({"columns": list(df.columns), "rows": df.tail(200).to_dict(orient="records")})
 
 
 # ======================================================
